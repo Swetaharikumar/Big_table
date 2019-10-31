@@ -14,10 +14,10 @@ grade1:
 
 grade2:
 	python3 -m pip install --user BTrees
-	cd grading_str/ && python3 grading.py 2 $(MASTER_HOSTNAME) $(MASTER_PORT)
+	python3 grading_str/grading.py 2 $(MASTER_HOSTNAME) $(MASTER_PORT)
 
 test2:
-	cd grading_str/ && python3 grading.py t Special $(MASTER_HOSTNAME) $(MASTER_PORT)
+	python3 grading_str/grading.py t Special $(MASTER_HOSTNAME) $(MASTER_PORT)
 
 master:
 	python3 before_start.py
