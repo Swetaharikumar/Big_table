@@ -105,6 +105,10 @@ class UrlParser():
                 self.return_dict["function_name"] = master_const.del_function_types[1]
                 self.return_dict["table_name"] = url[2]
 
+        # tablet start
+        elif url[0] == 'start':
+            self.return_dict["function_name"] = master_const.post_function_types[4]
+
         else:
             self.return_dict["is_404"] = True
 

@@ -142,6 +142,16 @@ class MasterHandler(BaseHTTPRequestHandler):
                 master_const.locks[dict_return["table_name"]].append(client_data["client_id"])
                 self._set_response(200)
 
+        # tablet start
+        elif dict_return["function_name"] == master_const.post_function_types[4]:
+            client_data = json.loads(post_data)
+            tablet_hostname = client_data["hostname"]
+            tablet_port = client_data["port"]
+            tablet_name = "tablet"+str(len(master_const.running_tablets)+1)
+            master_const.running_tablets.append(tablet_name)
+            master_const.table_info.update({tablet_name: {"hostname": tablet_hostname, "port": tablet_port}})
+
+
     def do_DELETE(self):
         master_const.check_start = True
         data = None
@@ -203,58 +213,46 @@ class MasterHandler(BaseHTTPRequestHandler):
 
 def check_tablets():
     count = 0
-    tablets = ["tablet1", "tablet2"]
     while True:
-        if master_const.check_start and len(tablets) > 0:
-            tablet_name = tablets[count % len(tablets)]
+        if master_const.check_start and len(master_const.running_tablets) > 0:
+            tablet_name = master_const.running_tablets[count % len(master_const.running_tablets)]
             url_check = MasterSupport.url(master_const.tablets_info[tablet_name]["hostname"],
                                           master_const.tablets_info[tablet_name]["port"],
                                           "/Check/")
             try:
                 response = requests.post(url_check, timeout=5)
             except:
+                # print("Dr. Evil is invading " + tablet_name + "!")
                 print(tablet_name + " is down!")
-                tablets.remove(tablet_name)
+                master_const.running_tablets.remove(tablet_name)
 
-                # Another tablet server takes control
-                another_tablet_name = tablets[count % len(tablets)]
-                print(another_tablet_name + " stands out to save the world!")
-                url_recover = MasterSupport.url(master_const.tablets_info[another_tablet_name]["hostname"],
-                                                master_const.tablets_info[another_tablet_name]["port"],
-                                                "/Recover/")
-                requests.post(url_recover, json={"hostname": master_const.tablets_info[another_tablet_name]["hostname"],
-                                                 "port": master_const.tablets_info[tablet_name]["port"]})
-                print("---------before------------")
-                print(master_const.server_table_dict)
-                print(master_const.server_load_dict)
-                print(master_const.tablets_info)
-                print(master_const.table_names)
-                print(master_const.table_info)
-                print("---------before------------")
-                master_const.server_load_dict[another_tablet_name] += master_const.server_load_dict[tablet_name]
-                master_const.server_load_dict[tablet_name] = 0
-                for table_name in master_const.server_table_dict[tablet_name]:
-                    master_const.table_info[table_name]["tablets"].remove(
-                        {"hostname": master_const.tablets_info[tablet_name]["hostname"],
-                         "port": master_const.tablets_info[tablet_name]["port"]})
-                    if {"hostname": master_const.tablets_info[another_tablet_name]["hostname"],
-                        "port": master_const.tablets_info[another_tablet_name]["port"]} not in \
-                            master_const.table_info[table_name]["tablets"]:
-                        master_const.table_info[table_name]["tablets"].append(
-                            {"hostname": master_const.tablets_info[another_tablet_name]["hostname"],
-                             "port": master_const.tablets_info[another_tablet_name]["port"]})
-                master_const.server_table_dict[another_tablet_name] += master_const.server_table_dict[tablet_name]
-                master_const.server_table_dict[tablet_name] = []
-                print("---------after------------")
-                print(master_const.server_table_dict)
-                print(master_const.server_load_dict)
-                print(master_const.tablets_info)
-                print(master_const.table_names)
-                print(master_const.table_info)
-                print("---------after------------")
-                print("recovery done")
-                # print("Hero needs good rest")
-                time.sleep(100)
+                if len(master_const.running_tablets)> 0:
+                    # Another tablet server takes control
+                    another_tablet_name = master_const.running_tablets[count % len(master_const.running_tablets)]
+                    # print(another_tablet_name + " stands out to save the world!")
+                    print(another_tablet_name + " is taking control...")
+                    url_recover = MasterSupport.url(master_const.tablets_info[another_tablet_name]["hostname"],
+                                                    master_const.tablets_info[another_tablet_name]["port"],
+                                                    "/Recover/")
+                    requests.post(url_recover, json={"hostname": master_const.tablets_info[another_tablet_name]["hostname"],
+                                                     "port": master_const.tablets_info[tablet_name]["port"]})
+                    master_const.server_load_dict[another_tablet_name] += master_const.server_load_dict[tablet_name]
+                    master_const.server_load_dict[tablet_name] = 0
+                    for table_name in master_const.server_table_dict[tablet_name]:
+                        master_const.table_info[table_name]["tablets"].remove(
+                            {"hostname": master_const.tablets_info[tablet_name]["hostname"],
+                             "port": master_const.tablets_info[tablet_name]["port"]})
+                        if {"hostname": master_const.tablets_info[another_tablet_name]["hostname"],
+                            "port": master_const.tablets_info[another_tablet_name]["port"]} not in \
+                                master_const.table_info[table_name]["tablets"]:
+                            master_const.table_info[table_name]["tablets"].append(
+                                {"hostname": master_const.tablets_info[another_tablet_name]["hostname"],
+                                 "port": master_const.tablets_info[another_tablet_name]["port"]})
+                    master_const.server_table_dict[another_tablet_name] += master_const.server_table_dict[tablet_name]
+                    master_const.server_table_dict[tablet_name] = []
+                    # print("Hero needs good rest")
+                    print("recovery done")
+                    time.sleep(100)
 
         time.sleep(5)
         count += 1
@@ -273,15 +271,6 @@ if __name__ == "__main__":
     server_class = HTTPServer
 
     httpd = HTTPServer(server_address, handler_class)
-
-    # check_start = False
-    # try:
-    #     x = threading.Thread(target=check_tablets)
-    #     x.start()
-    # except KeyboardInterrupt:
-    #     pass
-    # except:
-    #     print("Error: unable to start thread")
 
     print("Master server running at " + hostname + " " + str(port))
 

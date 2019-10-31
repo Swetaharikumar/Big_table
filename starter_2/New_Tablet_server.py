@@ -6,6 +6,7 @@ from consts import Const
 import pickle
 import sys
 from BTrees.OOBTree import OOBTree
+from Master_support import MasterSupport
 
 
 # table_names = {"tables" : []}
@@ -273,6 +274,9 @@ if __name__ == "__main__":
     #         data_json = json.dumps(const.WAL[i]["cell"])
     #         post_data = data_json.encode("utf8")
     #         const.insert(const.WAL[i]["table_name"], post_data, True)
+
+    url = MasterSupport.url(master_hostname,master_port, "/start/")
+    response = requests.post(url, json={"hostname": hostname, "port": port})
 
     print("Tablet server running at " + hostname + " " + str(port))
 
