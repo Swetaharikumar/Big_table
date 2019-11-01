@@ -6,8 +6,6 @@ from consts import Const
 import pickle
 import sys
 from BTrees.OOBTree import OOBTree
-from Master_support import MasterSupport
-import requests
 
 
 # table_names = {"tables" : []}
@@ -116,6 +114,7 @@ class MyHandler(BaseHTTPRequestHandler):
 
                 # Write to manifest variable
                 const.manifest["table_names"]["tables"].append(my_dict['name'])
+                const.shard_info["table_name"] = my_dict['name']
                 const.manifest["table_meta_data"][my_dict['name']] = my_dict
 
                 # Write manifest to disk for recovery purposes
@@ -166,10 +165,11 @@ class MyHandler(BaseHTTPRequestHandler):
             try:
                 with open(manifest_filename, 'rb') as new_file:
                     manifest = pickle.load(new_file)
-                    # update ssindex
+                    # update 
                     for table_name in manifest["ssindex"]:
                         if table_name not in const.manifest["ssindex"]:
                             const.manifest["ssindex"].update({table_name: {}})
+
                         for column_family in manifest["ssindex"][table_name]:
                             if column_family not in const.manifest["ssindex"][table_name]:
                                 const.manifest["ssindex"][table_name].update({column_family: {}})
@@ -181,9 +181,11 @@ class MyHandler(BaseHTTPRequestHandler):
                                         const.manifest["ssindex"][table_name][column_family][column].update({row: []})
                                     const.manifest["ssindex"][table_name][column_family][column][row] += \
                                         manifest["ssindex"][table_name][column_family][column][row]
+
                     for table_name in manifest["ssindex_2"]:
                         if table_name not in const.manifest["ssindex_2"]:
                             const.manifest["ssindex_2"].update({table_name: {}})
+
                         for column_family in manifest["ssindex_2"][table_name]:
                             if column_family not in const.manifest["ssindex_2"][table_name]:
                                 const.manifest["ssindex_2"][table_name].update({column_family: {}})
@@ -203,7 +205,7 @@ class MyHandler(BaseHTTPRequestHandler):
                         if table_name not in const.manifest["table_meta_data"]:
                             const.manifest["table_meta_data"][table_name] = {"name": table_name, "column_families": []}
                         const.manifest["table_meta_data"][table_name]["column_families"] += \
-                            manifest["table_meta_data"][table_name]["column_families"]
+                        manifest["table_meta_data"][table_name]["column_families"]
 
                 with open(const.manifest_filename, 'wb') as outfile:
                     pickle.dump(const.manifest, outfile)
@@ -214,18 +216,6 @@ class MyHandler(BaseHTTPRequestHandler):
 
         # regular check
         elif path[1] == const.post_function_types[3]:
-            self._set_response(200)
-
-        # sharding
-        elif path[1] == const.post_function_types[4]:
-            data = json.loads(post_data)
-            table_name = data["table_name"]
-            column_family = data["column_family"]
-            column = data["column"]
-            const.manifest["ssindex"].update({table_name: data["ssindex"][table_name]})
-            const.manifest["table_names"]["tables"].append(table_name)
-            const.manifest["table_meta_data"].update({table_name: {"name": table_name, "column_families": [
-                {"column_family_key": column_family, "columns": [column]}]}})
             self._set_response(200)
 
         else:
@@ -265,10 +255,21 @@ if __name__ == "__main__":
     hostname = sys.argv[1]
     port = int(sys.argv[2])
 
+    
+
     master_hostname = sys.argv[3]
     master_port = int(sys.argv[4])
 
+  
+
+
     const = Const(hostname, port)
+
+    const.shard_info["tablet_hostname"] = hostname
+    const.shard_info["tablet_port"] = str(port)
+
+    const.master_info["master_hostname"] = master_hostname
+    const.master_info["master_port"] = str(master_port)
 
     server_address = (hostname, port)
     master_server_address = (master_hostname, master_port)
@@ -302,9 +303,6 @@ if __name__ == "__main__":
     #         data_json = json.dumps(const.WAL[i]["cell"])
     #         post_data = data_json.encode("utf8")
     #         const.insert(const.WAL[i]["table_name"], post_data, True)
-
-    url = MasterSupport.url(master_hostname, master_port, "/start/")
-    response = requests.post(url, json={"hostname": hostname, "port": port})
 
     print("Tablet server running at " + hostname + " " + str(port))
 

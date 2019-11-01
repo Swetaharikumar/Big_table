@@ -2,6 +2,7 @@ import json
 import consts as const
 # pip install BTrees
 from BTrees.OOBTree import OOBTree
+from Master_support import MasterSupport
 import pickle
 import os
 # import Operation as op
@@ -17,7 +18,7 @@ class Const:
         # del_function_types = ['Delete Table']
 
         self.get_function_types = ['Retrieve a Cell', 'Retrieve Cells', 'Retrieve a Row']
-        self.post_function_types = ['Create', 'Insert Cell', 'Recover', 'Check', 'Sharding']
+        self.post_function_types = ['Create', 'Insert Cell', 'Recover', 'Check']
         self.del_function_types = ['Delete']
 
         self.manifest_filename = "manifest_" + hostname + "_" + str(port) + ".txt"
@@ -31,6 +32,29 @@ class Const:
         self.max_entries = 100
         self.entries = 0
         self.WALnum = 0
+        self.shard_info = {}
+        self.internal_shard = 500
+        self.external_shard = 1000
+        self.master_info = {}
+        self.sharded = False
+
+
+    def forward_to_master(self,data, table_name, request_type):
+        url_master = MasterSupport.url(const.master_info["master_hostname"],
+                                           const.master_info["master_port"], "/sharding/")
+
+        forward_dict = {}
+        forward_dict["data"] = data
+        forward_dict["table_name"] = table_name
+
+        if(request_type == "insert"):
+            response = requests.post(url_master, json=self.forward_dict)
+
+        elif request_type == "retrieve":
+            response = requests.get(url_master, json=self.forward_dict)
+
+
+
 
     def insert(self, table_name, post_data, recover):
         if table_name not in self.manifest["table_names"]["tables"]:
@@ -61,14 +85,46 @@ class Const:
             self.mem_table[table_name][cell["column_family"]] = {}
         if cell["column"] not in self.mem_table[table_name][cell["column_family"]]:
             self.mem_table[table_name][cell["column_family"]][cell["column"]] = OOBTree()
+
+        try:
+            if self.sharded == True:
+                if self.shard_info["data"]["table_name"] == table_name:
+                    if self.shard_info["data"]["column_family"] == cell["column_family"]:
+                        if self.shard_info["data"]["column"] == cell["column"]:
+                            self.forward_to_master(self,cell,table_name,"insert")
+                            return 200
+        except:
+            pass
+
+        
+
+
+
+
+
+
         t = self.mem_table[table_name][cell["column_family"]][cell["column"]]
         if cell["row"] not in t:
             t.update({cell["row"]: {"row": cell["row"], "data": cell["data"]}})
         else:
             t[cell["row"]]["data"] += cell["data"]
+
             # Garbage collection
             while len(t[cell["row"]]["data"]) > 5:
                 t[cell["row"]]["data"].pop(0)
+        # Send sharding request to master
+        if(len(t) > self.external_shard):
+            self.shard_info["data"]["ssindex"] = self.manifest["ssindex2"]
+            self.sharded = True
+
+            url_master = MasterSupport.url(const.master_info["master_hostname"],
+                                           const.master_info["master_port"], "/sharding/")
+
+            response = requests.post(url_master, json=self.shard_info)
+
+
+        print("response over")
+        self.shard_info["row_from_1"] = 0
         self.entries = self.entries + 1
         if self.entries == self.max_entries:
             self.spill_to_disk()
@@ -110,8 +166,15 @@ class Const:
             return {"success": False, "success_code": 409}
         if input["row"] not in rows_ss1:
             rows = rows_ss2
+            if self.sharded == True:
+                if self.shard_info["data"]["table_name"] == table_name:
+                    if self.shard_info["data"]["column_family"] == input["column_family"]:
+                        if self.shard_info["data"]["column"] == input["column"]:
+                            self.forward_to_master(self,input,table_name,"retrieve")
+                            return 200
         else:
             rows = rows_ss1
+
 
         for file_dict in rows[input["row"]]:
             with open(file_dict["file_name"], 'r') as file:
@@ -219,7 +282,7 @@ class Const:
 
                         sstable1 = True
                         
-                        if(len(self.manifest["ssindex"][table_name][column_family][column]) <500):
+                        if(len(self.manifest["ssindex"][table_name][column_family][column]) <self.internal_shard):
                             for row in self.mem_table[table_name][column_family][column]:
                                 if row not in self.manifest["ssindex"][table_name][column_family][column]:
                                     self.manifest["ssindex"][table_name][column_family][column].update({row: []})
@@ -228,8 +291,15 @@ class Const:
                                 outfile.write("\n")
                                 self.manifest["ssindex"][table_name][column_family][column][row].insert(0, {
                                 "file_name": file_name, "offset": last_pos})
-                        else:
-                            print("SS_Table2 reached")
+                        elif(len(self.manifest["ssindex"][table_name][column_family][column]) >=self.internal_shard):
+
+                            self.shard_info["row_to_1"] = self.internal_shard
+                            self.shard_info["row_from_2"] = self.internal_shard
+                            self.shard_info["row_to_2"] = self.external_shard 
+                            self.shard_info["data"] = {}
+                            self.shard_info["data"]["table_name"] = self.manifest["ssindex"][table_name]
+                            self.shard_info["data"]["column_family"] = self.manifest["ssindex"][table_name][column_family]
+                            self.shard_info["data"]["column"] = self.manifest["ssindex"][table_name][column_family][column]
                             
                             for row in self.mem_table[table_name][column_family][column]:
                                 if row not in self.manifest["ssindex_2"][table_name][column_family][column]:
