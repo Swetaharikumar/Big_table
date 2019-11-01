@@ -41,7 +41,7 @@ class Const:
 
     def forward_to_master(self,data, table_name, request_type):
         url_master = MasterSupport.url(const.master_info["master_hostname"],
-                                           const.master_info["master_port"], "/sharding/")
+                                           const.master_info["master_port"], "/forward/")
 
         forward_dict = {}
         forward_dict["data"] = data
