@@ -149,7 +149,8 @@ class MasterHandler(BaseHTTPRequestHandler):
             tablet_port = client_data["port"]
             tablet_name = "tablet"+str(len(master_const.running_tablets)+1)
             master_const.running_tablets.append(tablet_name)
-            master_const.table_info.update({tablet_name: {"hostname": tablet_hostname, "port": tablet_port}})
+            master_const.tablets_info.update({tablet_name: {"hostname": tablet_hostname, "port": tablet_port}})
+            self._set_response(200)
 
 
     def do_DELETE(self):
