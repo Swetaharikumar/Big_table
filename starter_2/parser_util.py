@@ -109,6 +109,14 @@ class UrlParser():
         elif url[0] == 'start':
             self.return_dict["function_name"] = master_const.post_function_types[4]
 
+        # sharding
+        elif url[0] == 'sharding':
+            self.return_dict["function_name"] = master_const.post_function_types[5]
+
+        # forward
+        elif url[0] == 'forward':
+            self.return_dict["function_name"] = master_const.post_function_types[6]
+
         else:
             self.return_dict["is_404"] = True
 

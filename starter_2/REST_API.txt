@@ -1,0 +1,23 @@
+There are two APIs
+
+1. sharding part of the table, for example, if [0, 500) and [500, 1000)
+url: "/sharding/"
+json: {
+  "table_name": table_name
+  "row_from_1": 0
+  "row_to_1": 500
+  "row_from_2": 500
+  "row_to_2": 1000
+  "tablet_hostname": hostname of that tablet
+  "tablet_port": port of that tablet 
+  "data": {
+    "ssindex": the sstable
+  }
+}
+
+2. forward the request if it belongs to another tablet
+url: "/forward/"
+json: {
+  "data": the request json
+  "table_name": the table name
+}

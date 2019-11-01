@@ -147,9 +147,56 @@ class MasterHandler(BaseHTTPRequestHandler):
             client_data = json.loads(post_data)
             tablet_hostname = client_data["hostname"]
             tablet_port = client_data["port"]
-            tablet_name = "tablet"+str(len(master_const.running_tablets)+1)
+            tablet_name = "tablet" + str(len(master_const.running_tablets) + 1)
             master_const.running_tablets.append(tablet_name)
             master_const.tablets_info.update({tablet_name: {"hostname": tablet_hostname, "port": tablet_port}})
+            self._set_response(200)
+
+        # sharding
+        elif dict_return["function_name"] == master_const.post_function_types[5]:
+            client_data = json.loads(post_data)
+            table_name = client_data["table_name"]
+            row_from_1 = client_data["row_from_1"]
+            row_to_1 = client_data["row_to_1"]
+            row_from_2 = client_data["row_from_2"]
+            row_to_2 = client_data["row_to_2"]
+            tablet_hostname = client_data["hostname"]
+            tablet_port = client_data["port"]
+            new_tablet_name = ""
+            new_tablet_hostname = ""
+            new_tablet_port = ""
+            for running_tablet_name in master_const.running_tablets:
+                if not master_const.tablets_info[running_tablet_name]["hostname"] == tablet_hostname or not master_const.tablets_info[running_tablet_name]["port"] == tablet_port:
+                    new_tablet_name = running_tablet_name
+                    new_tablet_hostname = master_const.tablets_info[running_tablet_name]["hostname"]
+                    new_tablet_port = master_const.tablets_info[running_tablet_name]["port"]
+                    break
+            for running_tablet_name in master_const.running_tablets:
+                if master_const.tablets_info[running_tablet_name]["hostname"] == tablet_hostname and master_const.tablets_info[running_tablet_name]["port"] == tablet_port:
+                    tablet_name = running_tablet_name
+            if new_tablet_name == "":
+                # no other tablets
+                self._set_response(400)
+                return
+            # assume we only shard once
+            if len(master_const.table_info[table_name]["tablets"])>1:
+                self._set_response(401)
+                return
+            master_const.table_info[table_name]["tablets"][0].update({"row_from": row_from_1, "row_to": row_to_1})
+            master_const.table_info[table_name]["tablets"].append({"hostname": new_tablet_hostname, "port": new_tablet_port, "row_from": row_from_2, "row_to": row_to_2})
+            url = MasterSupport.url(new_tablet_hostname, new_tablet_port, "/Sharding/")
+            requests.post(url, json=client_data["data"])
+            self._set_response(200)
+
+        # forward
+        elif dict_return["function_name"] == master_const.post_function_types[6]:
+            client_data = json.loads(post_data)
+            table_name = client_data["table_name"]
+            table_info = master_const.table_info[table_name]["tablets"][1]
+            if client_data["data"]["row"] > table_info["row_to"]:
+                table_info["row_to"] = client_data["data"]["row"]
+            url = MasterSupport.url(new_tablet_hostname, new_tablet_port, "/api/table/"+table_name+"/cell")
+            requests.post(url, json=client_data["data"])
             self._set_response(200)
 
 
@@ -227,7 +274,7 @@ def check_tablets():
                 print(tablet_name + " is down!")
                 master_const.running_tablets.remove(tablet_name)
 
-                if len(master_const.running_tablets)> 0:
+                if len(master_const.running_tablets) > 0:
                     # Another tablet server takes control
                     another_tablet_name = master_const.running_tablets[count % len(master_const.running_tablets)]
                     # print(another_tablet_name + " stands out to save the world!")
@@ -235,8 +282,9 @@ def check_tablets():
                     url_recover = MasterSupport.url(master_const.tablets_info[another_tablet_name]["hostname"],
                                                     master_const.tablets_info[another_tablet_name]["port"],
                                                     "/Recover/")
-                    requests.post(url_recover, json={"hostname": master_const.tablets_info[another_tablet_name]["hostname"],
-                                                     "port": master_const.tablets_info[tablet_name]["port"]})
+                    requests.post(url_recover,
+                                  json={"hostname": master_const.tablets_info[another_tablet_name]["hostname"],
+                                        "port": master_const.tablets_info[tablet_name]["port"]})
                     master_const.server_load_dict[another_tablet_name] += master_const.server_load_dict[tablet_name]
                     master_const.server_load_dict[tablet_name] = 0
                     for table_name in master_const.server_table_dict[tablet_name]:

@@ -9,6 +9,7 @@ from BTrees.OOBTree import OOBTree
 from Master_support import MasterSupport
 import requests
 
+
 # table_names = {"tables" : []}
 # table_meta_data = {}
 # mem_table = {}
@@ -202,7 +203,7 @@ class MyHandler(BaseHTTPRequestHandler):
                         if table_name not in const.manifest["table_meta_data"]:
                             const.manifest["table_meta_data"][table_name] = {"name": table_name, "column_families": []}
                         const.manifest["table_meta_data"][table_name]["column_families"] += \
-                        manifest["table_meta_data"][table_name]["column_families"]
+                            manifest["table_meta_data"][table_name]["column_families"]
 
                 with open(const.manifest_filename, 'wb') as outfile:
                     pickle.dump(const.manifest, outfile)
@@ -213,6 +214,18 @@ class MyHandler(BaseHTTPRequestHandler):
 
         # regular check
         elif path[1] == const.post_function_types[3]:
+            self._set_response(200)
+
+        # sharding
+        elif path[1] == const.post_function_types[4]:
+            data = json.loads(post_data)
+            table_name = data["table_name"]
+            column_family = data["column_family"]
+            column = data["column"]
+            const.manifest["ssindex"].update({table_name: data["ssindex"][table_name]})
+            const.manifest["table_names"]["tables"].append(table_name)
+            const.manifest["table_meta_data"].update({table_name: {"name": table_name, "column_families": [
+                {"column_family_key": column_family, "columns": [column]}]}})
             self._set_response(200)
 
         else:
@@ -290,7 +303,7 @@ if __name__ == "__main__":
     #         post_data = data_json.encode("utf8")
     #         const.insert(const.WAL[i]["table_name"], post_data, True)
 
-    url = MasterSupport.url(master_hostname,master_port, "/start/")
+    url = MasterSupport.url(master_hostname, master_port, "/start/")
     response = requests.post(url, json={"hostname": hostname, "port": port})
 
     print("Tablet server running at " + hostname + " " + str(port))

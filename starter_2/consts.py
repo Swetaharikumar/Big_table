@@ -17,7 +17,7 @@ class Const:
         # del_function_types = ['Delete Table']
 
         self.get_function_types = ['Retrieve a Cell', 'Retrieve Cells', 'Retrieve a Row']
-        self.post_function_types = ['Create', 'Insert Cell', 'Recover', 'Check']
+        self.post_function_types = ['Create', 'Insert Cell', 'Recover', 'Check', 'Sharding']
         self.del_function_types = ['Delete']
 
         self.manifest_filename = "manifest_" + hostname + "_" + str(port) + ".txt"
