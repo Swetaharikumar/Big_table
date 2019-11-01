@@ -12,6 +12,9 @@ json: {
   "tablet_port": port of that tablet 
   "data": {
     "ssindex": the sstable
+    "table_name": the table name
+    "column_family": the sharding column family
+    "column": the sharding column
   }
 }
 
