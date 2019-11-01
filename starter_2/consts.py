@@ -11,7 +11,7 @@ class Const:
     def __init__(self, hostname, port):
         self.table_names = {"tables": []}
         self.table_meta_data = {}
-        self.manifest = {"ssindex": {}, "table_names": {"tables": []}, "table_meta_data": {}, "filenum": 0, "files": []}
+        self.manifest = {"ssindex": {},"ssindex_2":{}, "table_names": {"tables": []}, "table_meta_data": {}, "filenum": 0, "files": []}
         # post_function_types = ['Create Table', 'Insert Cell', "Set Max Entries"]
         # get_function_types = ['List Table', 'Get Table Info', 'Retrieve a Cell', 'Retrieve Cells', 'Retrieve a Row']
         # del_function_types = ['Delete Table']
@@ -97,12 +97,22 @@ class Const:
                                     input["row"]]}
 
         # Not found in memory
+        rows_ss1 = {}
+        rows_ss2 = {}
+        rows = {}
         try:
-            rows = self.manifest["ssindex"][table_name][input["column_family"]][input["column"]]
+            rows_ss1 = self.manifest["ssindex"][table_name][input["column_family"]][input["column"]]
+            rows_ss2 = self.manifest["ssindex_2"][table_name][input["column_family"]][input["column"]]
         except:
             return {"success": False, "success_code": 409}
-        if input["row"] not in rows:
+
+        if input["row"] not in rows_ss1 and input["row"] not in rows_ss2 :
             return {"success": False, "success_code": 409}
+        if input["row"] not in rows_ss1:
+            rows = rows_ss2
+        else:
+            rows = rows_ss1
+
         for file_dict in rows[input["row"]]:
             with open(file_dict["file_name"], 'r') as file:
                 file.seek(file_dict["offset"])
@@ -137,7 +147,11 @@ class Const:
         try:
             rows = self.manifest["ssindex"][table_name][input["column_family"]][input["column"]]
         except:
-            return {"success": False, "success_code": 409}
+            try:
+                rows = self.manifest["ssindex_2"][table_name][input["column_family"]][input["column"]] 
+            except:
+                return {"success": False, "success_code": 409}
+                
         keys = list(rows.values(input["row_from"], input["row_to"]))
         for row in keys:
             for file_dict in row:
@@ -188,20 +202,44 @@ class Const:
             for table_name in self.mem_table:
                 if table_name not in self.manifest["ssindex"]:
                     self.manifest["ssindex"].update({table_name: {}})
+                if table_name not in self.manifest["ssindex_2"]:
+                    self.manifest["ssindex_2"].update({table_name: {}})
+
+                
                 for column_family in self.mem_table[table_name]:
                     if column_family not in self.manifest["ssindex"][table_name]:
                         self.manifest["ssindex"][table_name].update({column_family: {}})
+                    if column_family not in self.manifest["ssindex_2"][table_name]:
+                        self.manifest["ssindex_2"][table_name].update({column_family: {}})
                     for column in self.mem_table[table_name][column_family]:
                         if column not in self.manifest["ssindex"][table_name][column_family]:
                             self.manifest["ssindex"][table_name][column_family].update({column: OOBTree()})
-                        for row in self.mem_table[table_name][column_family][column]:
-                            if row not in self.manifest["ssindex"][table_name][column_family][column]:
-                                self.manifest["ssindex"][table_name][column_family][column].update({row: []})
-                            last_pos = outfile.tell()
-                            json.dump(self.mem_table[table_name][column_family][column][row], outfile)
-                            outfile.write("\n")
-                            self.manifest["ssindex"][table_name][column_family][column][row].insert(0, {
+                        if column not in self.manifest["ssindex_2"][table_name][column_family]:
+                            self.manifest["ssindex_2"][table_name][column_family].update({column: OOBTree()})
+
+                        sstable1 = True
+                        
+                        if(len(self.manifest["ssindex"][table_name][column_family][column]) <500):
+                            for row in self.mem_table[table_name][column_family][column]:
+                                if row not in self.manifest["ssindex"][table_name][column_family][column]:
+                                    self.manifest["ssindex"][table_name][column_family][column].update({row: []})
+                                last_pos = outfile.tell()
+                                json.dump(self.mem_table[table_name][column_family][column][row], outfile)
+                                outfile.write("\n")
+                                self.manifest["ssindex"][table_name][column_family][column][row].insert(0, {
                                 "file_name": file_name, "offset": last_pos})
+                        else:
+                            print("SS_Table2 reached")
+                            
+                            for row in self.mem_table[table_name][column_family][column]:
+                                if row not in self.manifest["ssindex_2"][table_name][column_family][column]:
+                                    self.manifest["ssindex_2"][table_name][column_family][column].update({row: []})
+                                last_pos = outfile.tell()
+                                json.dump(self.mem_table[table_name][column_family][column][row], outfile)
+                                outfile.write("\n")
+                                self.manifest["ssindex_2"][table_name][column_family][column][row].insert(0, {
+                                "file_name": file_name, "offset": last_pos})
+                           
 
         os.remove(self.WAL_filename)
         self.mem_table = {}

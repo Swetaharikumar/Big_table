@@ -180,6 +180,21 @@ class MyHandler(BaseHTTPRequestHandler):
                                         const.manifest["ssindex"][table_name][column_family][column].update({row: []})
                                     const.manifest["ssindex"][table_name][column_family][column][row] += \
                                         manifest["ssindex"][table_name][column_family][column][row]
+                    for table_name in manifest["ssindex_2"]:
+                        if table_name not in const.manifest["ssindex_2"]:
+                            const.manifest["ssindex_2"].update({table_name: {}})
+                        for column_family in manifest["ssindex_2"][table_name]:
+                            if column_family not in const.manifest["ssindex_2"][table_name]:
+                                const.manifest["ssindex_2"][table_name].update({column_family: {}})
+                            for column in manifest["ssindex_2"][table_name][column_family]:
+                                if column not in const.manifest["ssindex_2"][table_name][column_family]:
+                                    const.manifest["ssindex_2"][table_name][column_family].update({column: OOBTree()})
+                                for row in manifest["ssindex_2"][table_name][column_family][column]:
+                                    if row not in const.manifest["ssindex_2"][table_name][column_family][column]:
+                                        const.manifest["ssindex_2"][table_name][column_family][column].update({row: []})
+                                    const.manifest["ssindex_2"][table_name][column_family][column][row] += \
+                                        manifest["ssindex_2"][table_name][column_family][column][row]
+
                     for table_name in manifest["table_names"]["tables"]:
                         if table_name not in const.manifest["table_names"]["tables"]:
                             const.manifest["table_names"]["tables"].append(table_name)
